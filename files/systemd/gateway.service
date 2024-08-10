@@ -1,0 +1,17 @@
+[Unit]
+Description=Gateway Service
+Wants=network.target
+After=network-online.target
+
+
+[Service]
+Environment=PODMAN_SYSTEMD_UNIT=%n
+Restart=on-failure
+TimeoutStopSec=70
+Type=forking
+
+ExecStart=/usr/bin/podman start gateway
+ExecStop=/usr/bin/podman stop gateway
+
+[Install]
+WantedBy=multi-user.target default.target

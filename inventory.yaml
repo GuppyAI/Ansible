@@ -1,0 +1,5 @@
+ungrouped:
+  hosts:
+    raspberry:
+      ansible_host: raspberrypi.local
+      ansible_user: sms-gateway

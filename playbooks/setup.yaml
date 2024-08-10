@@ -1,0 +1,82 @@
+- name: Install podman
+  hosts: raspberry
+  become: true
+  tasks:
+    - name: Get podman and install it
+      package:
+        name: "podman"
+        state: present
+- name: Install configuration
+  hosts: raspberry
+  become: true
+  tasks:
+      - name: Copy udev configuration
+        ansible.builtin.copy:
+            src: "../files/udev/40-modem.rules"
+            dest: "/etc/udev/rules.d/40-modem.rules"
+            mode: 0644
+      - name: Copy usb_modeswitch script
+        ansible.builtin.copy:
+            src: "../files/scripts/brovi_modeswitch.sh"
+            dest: "/usr/local/bin/brovi_modeswitch.sh"
+            mode: 0755
+      - name: Disable ModemManager
+        ansible.builtin.systemd_service:
+            name: ModemManager
+            daemon_reload: true
+            enabled: false
+            state: stopped
+      - name: Add option kernel module (GSM modem driver)
+        ansible.builtin.modprobe:
+            name: option
+            state: present
+            persistent: present
+      - name: Reboot
+        ansible.builtin.reboot:
+          reboot_timeout: 300
+          msg: "Rebooting to apply configuration changes"
+- name: Install application
+  hosts: raspberry
+  become: true
+  vars:
+    version: "240809223418feature_arm-images-arm64v8"
+  vars_files:
+    - vault.yaml
+  tasks:
+      - name: Pull application image
+        containers.podman.podman_image:
+          name: "ghcr.io/guppyai/sms-gateway:{{ version }}"
+      - name: Re-create Gateway container
+        containers.podman.podman_container:
+          name: gateway
+          image: "ghcr.io/guppyai/sms-gateway:{{ version }}"
+          state: stopped
+          recreate: true
+          detach: true
+          security_opt: "label=disable"
+          device: "/dev/ttyUSB1:/dev/ttyUSB1"
+          group_add: "dialout"
+          env:
+            GATEWAY_LOGGING_LEVEL: "info"
+            GATEWAY_SMS_MODEM_BAUD: 115200
+            GATEWAY_SMS_MODEM_DEVICE: "/dev/ttyUSB1"
+            GATEWAY_SMS_MODEM_POLLING: 1s
+            GATEWAY_SMS_TRACING: 0
+            GATEWAY_MESSAGING_ALLOWLIST: "{{ messaging.allowlist | join(',') }}"
+            GATEWAY_SERVICEBUS_SENDER_QUEUE: "{{ servicebus.sender.queue }}"
+            GATEWAY_SERVICEBUS_RECEIVER_QUEUE: "{{ servicebus.receiver.queue }}"
+            GATEWAY_SERVICEBUS_SENDER_CONNECTIONSTRING: "{{ servicebus.sender.connectionstring }}"
+            GATEWAY_SERVICEBUS_RECEIVER_CONNECTIONSTRING: "{{ servicebus.receiver.connectionstring }}"
+      - name: Install systemd unit for running application
+        become: yes
+        copy:
+            src: "../files/systemd/gateway.service"
+            dest: "/etc/systemd/system/gateway.service"
+            mode: 0644
+      - name: Enable and start application
+        become: yes
+        ansible.builtin.systemd_service:
+          name: gateway
+          daemon_reload: true
+          enabled: true
+          state: restarted

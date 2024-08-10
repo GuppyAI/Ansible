@@ -1,0 +1,13 @@
+# udev rules by Pavel Piatruk (https://blog.tanatos.org/posts/huawei_e3372h-325_brovi_with_linux_stickmode/)
+ACTION!="add", GOTO="modeswitch_rules_end"
+SUBSYSTEM!="usb", GOTO="modeswitch_rules_end"
+
+ATTRS{bInterfaceNumber}!="00", GOTO="modeswitch_rules_end"
+GOTO="modeswitch_rules_begin"
+
+LABEL="modeswitch_rules_begin"
+ATTR{idVendor}=="3566", ATTR{idProduct}=="2001", RUN+="/usr/local/bin/brovi_modeswitch.sh  %k %p"
+LABEL="modeswitch_rules_end"
+
+SUBSYSTEM=="net", ACTION=="add",  ATTRS{idVendor}=="3566", ATTRS{idProduct}=="2001", NAME="wwan_brovi"
+SUBSYSTEM=="tty", ACTION=="add", DEVPATH=="*:1.[24]/*", ATTRS{idVendor}=="3566", ATTRS{idProduct}=="2001", ENV{ID_MM_PORT_IGNORE}="1"
