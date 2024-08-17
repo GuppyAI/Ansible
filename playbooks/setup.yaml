@@ -39,10 +39,25 @@
   hosts: raspberry
   become: true
   vars:
-    version: "240809223418feature_arm-images-arm64v8"
+    version: "240817154217feature_improve-container"
   vars_files:
     - vault.yaml
   tasks:
+      - name: Create secret for allowlist
+        containers.podman.podman_secret:
+          name: GATEWAY_MESSAGING_ALLOWLIST
+          data: "{{ messaging.allowlist | join(',') }}"
+          force: true
+      - name: Create secret for sender connection string
+        containers.podman.podman_secret:
+          name: GATEWAY_SERVICEBUS_SENDER_CONNECTIONSTRING
+          data: "{{ servicebus.sender.connectionstring }}"
+          force: true
+      - name: Create secret for receiver connection string
+        containers.podman.podman_secret:
+          name: GATEWAY_SERVICEBUS_RECEIVER_CONNECTIONSTRING
+          data: "{{ servicebus.receiver.connectionstring }}"
+          force: true
       - name: Pull application image
         containers.podman.podman_image:
           name: "ghcr.io/guppyai/sms-gateway:{{ version }}"
@@ -56,23 +71,24 @@
           security_opt: "label=disable"
           device: "/dev/ttyUSB1:/dev/ttyUSB1"
           group_add: "dialout"
+          secrets:
+            - GATEWAY_MESSAGING_ALLOWLIST,type=env,target=GATEWAY_MESSAGING_ALLOWLIST
+            - GATEWAY_SERVICEBUS_SENDER_CONNECTIONSTRING,type=env,target=GATEWAY_SERVICEBUS_SENDER_CONNECTIONSTRING
+            - GATEWAY_SERVICEBUS_RECEIVER_CONNECTIONSTRING,type=env,target=GATEWAY_SERVICEBUS_RECEIVER_CONNECTIONSTRING
           env:
             GATEWAY_LOGGING_LEVEL: "info"
             GATEWAY_SMS_MODEM_BAUD: 115200
             GATEWAY_SMS_MODEM_DEVICE: "/dev/ttyUSB1"
             GATEWAY_SMS_MODEM_POLLING: 1s
             GATEWAY_SMS_TRACING: 0
-            GATEWAY_MESSAGING_ALLOWLIST: "{{ messaging.allowlist | join(',') }}"
             GATEWAY_SERVICEBUS_SENDER_QUEUE: "{{ servicebus.sender.queue }}"
             GATEWAY_SERVICEBUS_RECEIVER_QUEUE: "{{ servicebus.receiver.queue }}"
-            GATEWAY_SERVICEBUS_SENDER_CONNECTIONSTRING: "{{ servicebus.sender.connectionstring }}"
-            GATEWAY_SERVICEBUS_RECEIVER_CONNECTIONSTRING: "{{ servicebus.receiver.connectionstring }}"
       - name: Install systemd unit for running application
         become: yes
         copy:
-            src: "../files/systemd/gateway.service"
-            dest: "/etc/systemd/system/gateway.service"
-            mode: 0644
+          src: "../files/systemd/gateway.service"
+          dest: "/etc/systemd/system/gateway.service"
+          mode: 0644
       - name: Enable and start application
         become: yes
         ansible.builtin.systemd_service:
