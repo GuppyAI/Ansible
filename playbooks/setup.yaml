@@ -39,7 +39,7 @@
   hosts: raspberry
   become: true
   vars:
-    version: "240817154217feature_improve-container"
+    version: "240817160417main"
   vars_files:
     - vault.yaml
   tasks:
@@ -79,7 +79,7 @@
             GATEWAY_LOGGING_LEVEL: "info"
             GATEWAY_SMS_MODEM_BAUD: 115200
             GATEWAY_SMS_MODEM_DEVICE: "/dev/ttyUSB1"
-            GATEWAY_SMS_MODEM_POLLING: 1s
+            GATEWAY_SMS_POLLING: 100ms
             GATEWAY_SMS_TRACING: 0
             GATEWAY_SERVICEBUS_SENDER_QUEUE: "{{ servicebus.sender.queue }}"
             GATEWAY_SERVICEBUS_RECEIVER_QUEUE: "{{ servicebus.receiver.queue }}"
